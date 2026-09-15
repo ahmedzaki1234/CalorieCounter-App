@@ -1,0 +1,272 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>حاسبة السعرات الحرارية</title>
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icon.svg">
+<meta name="theme-color" content="#0f6e56">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="السعرات">
+<style>
+  :root{
+    --bg:#f7f6f2; --card:#ffffff; --border:#e3e1d9; --text:#1f1f1d;
+    --muted:#6f6e68; --accent:#0f6e56; --accent-light:#e1f5ee; --danger:#c0392b;
+  }
+  * { box-sizing: border-box; }
+  body{
+    margin:0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Tahoma, Arial, sans-serif;
+    background:var(--bg); color:var(--text); padding:16px; max-width:480px; margin:0 auto;
+  }
+  h1{ font-size:20px; font-weight:600; margin:0 0 4px; }
+  .sub{ font-size:13px; color:var(--muted); margin-bottom:16px; }
+  .search-box{ position:relative; margin-bottom:12px; }
+  input[type="text"]{
+    width:100%; padding:12px 14px; font-size:15px; border:1px solid var(--border);
+    border-radius:10px; background:var(--card); outline:none;
+  }
+  input[type="text"]:focus{ border-color:var(--accent); }
+  .status{ font-size:13px; color:var(--muted); min-height:18px; margin-bottom:8px; }
+  .results{ display:flex; flex-direction:column; gap:8px; margin-bottom:20px; }
+  .food-card{
+    background:var(--card); border:1px solid var(--border); border-radius:10px;
+    padding:10px 12px; display:flex; justify-content:space-between; align-items:center; gap:8px;
+  }
+  .food-info{ flex:1; min-width:0; }
+  .food-name{ font-size:14px; font-weight:600; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .food-meta{ font-size:12px; color:var(--muted); margin-top:2px; }
+  .add-btn{
+    flex-shrink:0; width:34px; height:34px; border-radius:50%; border:none;
+    background:var(--accent); color:#fff; font-size:18px; cursor:pointer; line-height:1;
+  }
+  .add-btn:active{ opacity:0.8; }
+  .summary{
+    background:var(--card); border:1px solid var(--border); border-radius:12px; padding:16px; margin-bottom:16px;
+  }
+  .summary-top{ display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; }
+  .summary-title{ font-size:13px; color:var(--muted); }
+  .reset-btn{
+    font-size:12px; color:var(--danger); background:none; border:1px solid var(--border);
+    padding:4px 10px; border-radius:8px; cursor:pointer;
+  }
+  .total-cal{ font-size:28px; font-weight:700; margin-bottom:12px; }
+  .total-cal span{ font-size:13px; font-weight:400; color:var(--muted); }
+  .macros{ display:grid; grid-template-columns:repeat(3,1fr); gap:8px; }
+  .macro-box{ background:var(--accent-light); border-radius:8px; padding:8px; text-align:center; }
+  .macro-val{ font-size:15px; font-weight:600; color:var(--accent); }
+  .macro-label{ font-size:11px; color:var(--muted); margin-top:2px; }
+  .log{ display:flex; flex-direction:column; gap:6px; }
+  .log-item{
+    display:flex; justify-content:space-between; align-items:center; font-size:13px;
+    padding:8px 4px; border-bottom:1px solid var(--border);
+  }
+  .log-item .qty{ color:var(--muted); }
+  .del{ background:none; border:none; color:var(--danger); font-size:16px; cursor:pointer; padding:2px 6px; }
+  .empty{ text-align:center; color:var(--muted); font-size:13px; padding:20px 0; }
+  .source-note{ font-size:11px; color:var(--muted); text-align:center; margin-top:20px; line-height:1.6; }
+</style>
+</head>
+<body>
+
+<h1>حاسبة السعرات الحرارية</h1>
+<div class="sub">ابحث عن أي طعام من قاعدة بيانات عالمية (Open Food Facts)</div>
+
+<div class="search-box">
+  <input type="text" id="search" placeholder="مثال: rice, hummus, pizza, sushi...">
+</div>
+<div class="status" id="status"></div>
+<div class="results" id="results"></div>
+
+<div class="summary">
+  <div class="summary-top">
+    <span class="summary-title">إجمالي اليوم</span>
+    <button class="reset-btn" onclick="resetLog()">تصفير</button>
+  </div>
+  <div class="total-cal" id="totalCal">0 <span>سعرة حرارية</span></div>
+  <div class="macros">
+    <div class="macro-box"><div class="macro-val" id="totalProtein">0غ</div><div class="macro-label">بروتين</div></div>
+    <div class="macro-box"><div class="macro-val" id="totalCarb">0غ</div><div class="macro-label">كارب</div></div>
+    <div class="macro-box"><div class="macro-val" id="totalFat">0غ</div><div class="macro-label">دهون</div></div>
+  </div>
+</div>
+
+<div class="log" id="log">
+  <div class="empty">لم تضف أي طعام بعد</div>
+</div>
+
+<div class="source-note">
+  البيانات من قاعدة بيانات Open Food Facts المفتوحة والمجانية (openfoodfacts.org)<br>
+  القيم لكل 100 غرام ما لم يُذكر خلاف ذلك
+</div>
+
+<script>
+const searchInput = document.getElementById('search');
+const resultsEl = document.getElementById('results');
+const statusEl = document.getElementById('status');
+const logEl = document.getElementById('log');
+
+const STORAGE_KEY = 'calorieAppLog';
+let log = [];
+let debounceTimer = null;
+
+function todayStr() {
+  return new Date().toISOString().slice(0, 10);
+}
+
+function loadLog() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (!raw) return;
+    const saved = JSON.parse(raw);
+    if (saved.date === todayStr()) {
+      log = saved.items || [];
+    }
+  } catch (err) {
+    console.error('تعذر تحميل السجل المحفوظ', err);
+  }
+}
+
+function saveLog() {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify({ date: todayStr(), items: log }));
+  } catch (err) {
+    console.error('تعذر حفظ السجل', err);
+  }
+}
+
+// --- Search Open Food Facts ---
+async function searchFood(query) {
+  if (!query.trim()) {
+    resultsEl.innerHTML = '';
+    statusEl.textContent = '';
+    return;
+  }
+  statusEl.textContent = 'جاري البحث...';
+  resultsEl.innerHTML = '';
+
+  try {
+    const url = `https://world.openfoodfacts.org/cgi/search.pl?search_terms=${encodeURIComponent(query)}&search_simple=1&action=process&json=1&page_size=12&fields=product_name,nutriments,brands`;
+    const res = await fetch(url);
+    const data = await res.json();
+
+    const products = (data.products || []).filter(p =>
+      p.product_name &&
+      p.nutriments &&
+      p.nutriments['energy-kcal_100g'] != null
+    );
+
+    if (products.length === 0) {
+      statusEl.textContent = 'لم يتم العثور على نتائج، جرّب اسم آخر (يفضل بالإنجليزية لنتائج أوسع)';
+      return;
+    }
+
+    statusEl.textContent = `${products.length} نتيجة`;
+    renderResults(products);
+  } catch (err) {
+    statusEl.textContent = 'حدث خطأ في الاتصال. تأكد من الإنترنت وحاول مرة أخرى.';
+    console.error(err);
+  }
+}
+
+function renderResults(products) {
+  resultsEl.innerHTML = '';
+  products.slice(0, 8).forEach(p => {
+    const n = p.nutriments;
+    const cal = Math.round(n['energy-kcal_100g'] || 0);
+    const protein = n['proteins_100g'] || 0;
+    const carb = n['carbohydrates_100g'] || 0;
+    const fat = n['fat_100g'] || 0;
+
+    const card = document.createElement('div');
+    card.className = 'food-card';
+    card.innerHTML = `
+      <div class="food-info">
+        <div class="food-name">${escapeHtml(p.product_name)}</div>
+        <div class="food-meta">${p.brands ? escapeHtml(p.brands) + ' · ' : ''}${cal} سعرة / 100غ</div>
+      </div>
+      <button class="add-btn" aria-label="إضافة">+</button>
+    `;
+    card.querySelector('.add-btn').onclick = () => {
+      addToLog({ name: p.product_name, cal, protein, carb, fat });
+    };
+    resultsEl.appendChild(card);
+  });
+}
+
+function escapeHtml(str) {
+  const div = document.createElement('div');
+  div.textContent = str;
+  return div.innerHTML;
+}
+
+// --- Log management ---
+function addToLog(food) {
+  log.push({ ...food, id: Date.now() + Math.random() });
+  saveLog();
+  renderLog();
+}
+
+function removeFromLog(id) {
+  log = log.filter(item => item.id !== id);
+  saveLog();
+  renderLog();
+}
+
+function resetLog() {
+  log = [];
+  saveLog();
+  renderLog();
+}
+
+function renderLog() {
+  let totalCal = 0, totalProtein = 0, totalCarb = 0, totalFat = 0;
+
+  if (log.length === 0) {
+    logEl.innerHTML = '<div class="empty">لم تضف أي طعام بعد</div>';
+  } else {
+    logEl.innerHTML = '';
+    log.forEach(item => {
+      totalCal += item.cal;
+      totalProtein += item.protein;
+      totalCarb += item.carb;
+      totalFat += item.fat;
+
+      const row = document.createElement('div');
+      row.className = 'log-item';
+      row.innerHTML = `
+        <span>${escapeHtml(item.name)}</span>
+        <span class="qty">${Math.round(item.cal)} سعرة</span>
+        <button class="del" aria-label="ح��ف">×</button>
+      `;
+      row.querySelector('.del').onclick = () => removeFromLog(item.id);
+      logEl.appendChild(row);
+    });
+  }
+
+  document.getElementById('totalCal').innerHTML = `${Math.round(totalCal)} <span>سعرة حرارية</span>`;
+  document.getElementById('totalProtein').textContent = Math.round(totalProtein) + 'غ';
+  document.getElementById('totalCarb').textContent = Math.round(totalCarb) + 'غ';
+  document.getElementById('totalFat').textContent = Math.round(totalFat) + 'غ';
+}
+
+// --- Input handling with debounce ---
+searchInput.addEventListener('input', (e) => {
+  clearTimeout(debounceTimer);
+  const query = e.target.value;
+  debounceTimer = setTimeout(() => searchFood(query), 500);
+});
+
+loadLog();
+renderLog();
+
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('sw.js').catch(err => console.error('SW error', err));
+  });
+}
+</script>
+
+</body>
+</html>

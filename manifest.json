@@ -1,0 +1,1 @@
+{"name":"حاسبة السعرات الحرارية","short_name":"السعرات","description":"ابحث عن أي طعام عالمي واحسب سعراتك الحرارية اليومية","start_url":"./calorie-app.html","display":"standalone","background_color":"#f7f6f2","theme_color":"#0f6e56","orientation":"portrait","dir":"rtl","lang":"ar","icons":[{"src":"icon.svg","sizes":"any","type":"image/svg+xml","purpose":"any maskable"}]}
